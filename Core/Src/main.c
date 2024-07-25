@@ -29,6 +29,12 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
+#include "i2c-lcd.h"
+#include <stdint.h>
+#include <string.h>
+#include <stdbool.h>
+#include <stdio.h>
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -38,6 +44,24 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
+
+#define IDLE                    0
+#define ABRE_ARQUIVO_ESCRITA    1
+#define ESPERA_RECEPCAO         2
+#define FECHA_ARQUIVO           3
+#define ABRE_ARQUIVO_LEITURA    4
+#define TOCA_AUDIO              5
+
+// Macros for us delay found on: https://deepbluembedded.com/stm32-systick-timer-microseconds-delay-us-delay-function/
+#define SYSTICK_LOAD (SystemCoreClock/1000000U)
+#define SYSTICK_DELAY_CALIB (SYSTICK_LOAD >> 1)
+ 
+#define DELAY_US(us) \
+    do { \
+         uint32_t start = SysTick->VAL; \
+         uint32_t ticks = (us * SYSTICK_LOAD)-SYSTICK_DELAY_CALIB;  \
+         while((start - SysTick->VAL) < ticks); \
+    } while (0)
 
 /* USER CODE END PD */
 
@@ -49,6 +73,20 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+
+uint32_t currentMillis, previousMillis;
+uint8_t Estado;
+
+char byte_read;
+char *sd_read_buffer = &byte_read;
+
+FATFS       FatFs;                //Fatfs handle
+FIL         fil;                  //File handle
+FRESULT     fres;                 //Result after operations
+UINT        WWC;
+char        buf[5];
+
+char lcd_buff[100];
 
 /* USER CODE END PV */
 
@@ -100,12 +138,152 @@ int main(void)
   MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
 
+    lcd_init(); 
+
+    HAL_Delay(2000);
+
+    lcd_clear();
+    lcd_put_cur(0,0);
+    lcd_send_string("Preparando SD");
+    HAL_Delay(2000);
+    lcd_put_cur(0,0);
+
+    do {
+        // Montando o cartão SD
+        fres = f_mount(&FatFs, "", 1);
+        if(fres != FR_OK){
+            lcd_send_string("SD Not Found");
+            Estado = IDLE;
+            break;
+        }
+        lcd_send_string("SD Mounted!");
+        HAL_Delay(2000);
+
+        // Obtendo espaço no disco
+        FATFS *pfs;
+        DWORD fre_clust;
+        uint32_t totalSpace, freeSpace;
+        f_getfree("", &fre_clust, &pfs);
+        totalSpace = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
+        freeSpace = (uint32_t)(fre_clust * pfs->csize * 0.5);
+        lcd_clear();
+        lcd_put_cur(0,0);
+        lcd_send_string("Total: ");
+        sprintf(lcd_buff, "%lu", totalSpace);
+        lcd_send_string(lcd_buff);
+        lcd_put_cur(1,0);
+        lcd_send_string("Free: ");
+        sprintf(lcd_buff, "%lu", freeSpace);
+        lcd_send_string(lcd_buff);
+        HAL_Delay(2000);
+
+        lcd_clear();
+        lcd_put_cur(0,0);
+        lcd_send_string("IDLE");
+        /*lcd_clear();*/
+        /*lcd_put_cur(0,0);*/
+        /*lcd_send_string("Data read:");*/
+        /*f_gets(buf, sizeof(buf), &fil);*/
+        /*lcd_put_cur(1,0);*/
+        /*lcd_send_string(buf);*/
+        /*HAL_Delay(5000);*/
+
+
+    } while (false);
+
+    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+
+    Estado = IDLE;
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
+    switch (Estado) {
+        case IDLE:
+        case ESPERA_RECEPCAO:
+            break;
+
+        case ABRE_ARQUIVO_ESCRITA:
+            break;
+
+        case ABRE_ARQUIVO_LEITURA:
+            // Abrindo o arquivo de audio
+            fres = f_open(&fil, "Audio.txt", FA_READ);
+            if (fres != FR_OK) {
+                lcd_clear();
+                lcd_put_cur(0,0);
+                lcd_send_string("File not read");
+                lcd_put_cur(1,0);
+                lcd_send_string("Error ");
+                sprintf(lcd_buff, "%d", fres);
+                lcd_send_string(lcd_buff);
+                Estado = IDLE;
+                break;
+            }
+            /*fres = f_open(&fil, "Audio.txt", FA_WRITE | FA_READ | FA_CREATE_ALWAYS);*/
+            /*lcd_clear();*/
+            /*lcd_put_cur(0,0);*/
+            /*if(fres != FR_OK){*/
+            /*    lcd_send_string("File not created");*/
+            /*    lcd_put_cur(1,0);*/
+            /*    lcd_send_string("Error ");*/
+            /*    sprintf(err, "%d", fres);*/
+            /*    lcd_send_string(err);*/
+            /*    Estado = IDLE;*/
+            /*    break;*/
+            /*}*/
+            lcd_clear();
+            lcd_put_cur(0,0);
+            lcd_send_string("File open!");
+            HAL_Delay(2000);
+
+            lcd_clear();
+            lcd_put_cur(0,0);
+            lcd_send_string("Data read:");
+            lcd_put_cur(1, 0);
+            for (int i = 0; i < 29999; i++) {
+                f_gets(sd_read_buffer, 2, &fil); 
+                // 22050Hz Audio => T = 45.35us
+                TIM1->CCR1 = (uint32_t) byte_read;
+                DELAY_US(33);
+
+                //sprintf(err, "%lu", (uint32_t) byte_read);
+                //lcd_send_string(err);
+                //HAL_Delay(500);
+            }
+            TIM1->CCR1 = 0; 
+            /*f_gets(buf, sizeof(buf), &fil);*/
+            /*lcd_put_cur(1,0);*/
+            /*lcd_send_string(buf);*/
+            /*HAL_Delay(1000);*/
+            /*f_gets(buf, sizeof(buf), &fil);*/
+            /*lcd_send_string(buf);*/
+            HAL_Delay(1000);
+
+            Estado = FECHA_ARQUIVO;
+            break;
+
+        case FECHA_ARQUIVO:
+            lcd_clear();
+            lcd_put_cur(0,0);
+            lcd_send_string("Closing file...");
+            HAL_Delay(2000);
+            f_close(&fil);
+
+            lcd_clear();
+            lcd_put_cur(0,0);
+            lcd_send_string("IDLE");
+
+            Estado = IDLE;
+            break;
+
+        case TOCA_AUDIO:
+            break;
+    }
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -153,6 +331,27 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
+    currentMillis = HAL_GetTick();
+
+    if(GPIO_Pin == GPIO_PIN_10 && (currentMillis - previousMillis > 1000)){
+        if(Estado == IDLE){
+            Estado = ABRE_ARQUIVO_LEITURA;
+        }
+    }
+    else if(GPIO_Pin == GPIO_PIN_11 && (currentMillis - previousMillis > 1000)){
+        if(Estado == IDLE){
+            Estado = ABRE_ARQUIVO_ESCRITA;
+        }
+        else if (Estado == ESPERA_RECEPCAO){
+            Estado = FECHA_ARQUIVO;
+        }
+    }
+
+    previousMillis = currentMillis;
+
+}
 
 /* USER CODE END 4 */
 
