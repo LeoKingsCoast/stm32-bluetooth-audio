@@ -22,6 +22,8 @@
 #include "fatfs.h"
 #include "i2c.h"
 #include "spi.h"
+#include "stm32f103xb.h"
+#include "stm32f1xx_hal_gpio.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -30,6 +32,7 @@
 /* USER CODE BEGIN Includes */
 
 #include "i2c-lcd.h"
+#include "stm32f1xx_hal.h"
 #include <stdint.h>
 #include <string.h>
 #include <stdbool.h>
@@ -73,6 +76,9 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+
+uint8_t rx_buffer[20];
+bool byte_ready = false;
 
 uint32_t currentMillis, previousMillis;
 uint8_t Estado;
@@ -204,15 +210,47 @@ int main(void)
 
     switch (Estado) {
         case IDLE:
+            break;
+
         case ESPERA_RECEPCAO:
+            if(byte_ready){
+                f_puts((const char*)rx_buffer, &fil);
+                HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+                //lcd_send_string((char*)rx_buffer);
+                byte_ready = false;
+                HAL_UART_Receive_DMA(&huart1, rx_buffer, 20);
+            }
             break;
 
         case ABRE_ARQUIVO_ESCRITA:
+            // Criando o arquivo que será usado. Se o arquivo já existe, será sobreescrito.
+            fres = f_open(&fil, "Audio_teste.txt", FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
+            lcd_clear();
+            lcd_put_cur(0,0);
+            if(fres != FR_OK){
+                lcd_send_string("File not created");
+                lcd_put_cur(1,0);
+                lcd_send_string("Error ");
+                sprintf(lcd_buff, "%d", fres);
+                lcd_send_string(lcd_buff);
+                Estado = IDLE;
+                break;
+            }
+            lcd_send_string("File open!");
+            HAL_Delay(2000);
+
+            lcd_clear();
+            lcd_put_cur(0,0);
+            lcd_send_string("Esperando...");
+            lcd_put_cur(1,0);
+            Estado = ESPERA_RECEPCAO;
+
+            HAL_UART_Receive_DMA(&huart1, rx_buffer, 20);
             break;
 
         case ABRE_ARQUIVO_LEITURA:
             // Abrindo o arquivo de audio
-            fres = f_open(&fil, "Audio.txt", FA_READ);
+            fres = f_open(&fil, "Audio_teste.txt", FA_READ);
             if (fres != FR_OK) {
                 lcd_clear();
                 lcd_put_cur(0,0);
@@ -331,6 +369,15 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
+    UNUSED(huart);
+
+    //f_puts((const char*)rx_buffer, &fil);
+    //f_write(&fil, rx_buffer, strlen((char*)rx_buffer), &WWC);
+    //lcd_send_string((char*)rx_buffer);
+    byte_ready = true;
+}
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
     currentMillis = HAL_GetTick();
