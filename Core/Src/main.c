@@ -22,8 +22,7 @@
 #include "fatfs.h"
 #include "i2c.h"
 #include "spi.h"
-#include "stm32f103xb.h"
-#include "stm32f1xx_hal_gpio.h"
+#include "stm32f1xx_hal_uart.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -77,8 +76,11 @@
 
 /* USER CODE BEGIN PV */
 
-uint8_t rx_buffer[20];
-bool byte_ready = false;
+uint8_t rx_buffer[256];
+uint8_t data_to_transfer[129];
+bool data_ready = false;
+
+uint8_t tx_buffer[256]; // For debugging
 
 uint32_t currentMillis, previousMillis;
 uint8_t Estado;
@@ -142,6 +144,7 @@ int main(void)
   MX_SPI1_Init();
   MX_TIM1_Init();
   MX_FATFS_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
     lcd_init(); 
@@ -213,12 +216,17 @@ int main(void)
             break;
 
         case ESPERA_RECEPCAO:
-            if(byte_ready){
-                f_puts((const char*)rx_buffer, &fil);
+            if(data_ready){
+                //HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
                 HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+                /*strcpy((char*)tx_buffer, "\n\rEscrita no SD:\n\r");*/
+                /*HAL_UART_Transmit(&huart2, tx_buffer, strlen((const char*)tx_buffer), 100);*/
+                /*HAL_UART_Transmit(&huart2, data_to_transfer, strlen((const char*)data_to_transfer), 100);*/
+                f_puts((const char*)data_to_transfer, &fil);
+                memset(data_to_transfer, '\0', 129);
                 //lcd_send_string((char*)rx_buffer);
-                byte_ready = false;
-                HAL_UART_Receive_DMA(&huart1, rx_buffer, 20);
+                data_ready = false;
+                /*HAL_UART_Receive_DMA(&huart1, rx_buffer, 256);*/
             }
             break;
 
@@ -245,7 +253,7 @@ int main(void)
             lcd_put_cur(1,0);
             Estado = ESPERA_RECEPCAO;
 
-            HAL_UART_Receive_DMA(&huart1, rx_buffer, 20);
+            HAL_UART_Receive_DMA(&huart1, rx_buffer, 256);
             break;
 
         case ABRE_ARQUIVO_LEITURA:
@@ -370,13 +378,45 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
+int HTC = 0, FTC = 0;
+int indx = 0;
+
+bool SizeRead = true;
+uint32_t file_size = 0;
+
+void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart){
+  if (!SizeRead) {
+    // size reading script
+    indx += 124;
+    SizeRead = true;
+  }
+  else {
+    /*memcpy(tx_buffer, rx_buffer, 256);*/
+    memcpy(data_to_transfer, rx_buffer, 128);
+    /*memset(tx_buffer, '\0', 256);*/
+    memset(rx_buffer, '\0', 128);
+    data_ready = true;
+  }
+  HTC = 1;
+  FTC = 0;
+}
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
-    UNUSED(huart);
+    /*UNUSED(huart);*/
 
     //f_puts((const char*)rx_buffer, &fil);
     //f_write(&fil, rx_buffer, strlen((char*)rx_buffer), &WWC);
     //lcd_send_string((char*)rx_buffer);
-    byte_ready = true;
+    /*memcpy(tx_buffer, rx_buffer, 256);*/
+    /*strcpy((char*)tx_buffer, "\n\rComplete callback: \n\r");*/
+    /*HAL_UART_Transmit(&huart2, tx_buffer, strlen((const char*)tx_buffer), 100);*/
+    /*HAL_UART_Transmit(&huart2, rx_buffer, 256, 100);*/
+    memcpy(data_to_transfer, rx_buffer + 128, 128);
+    /*memset(tx_buffer, '\0', 256);*/
+    memset(rx_buffer + 128, '\0', 128);
+    data_ready = true;
+    HTC = 0;
+    FTC = 1;
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
