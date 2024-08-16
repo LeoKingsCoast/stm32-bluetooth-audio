@@ -15,6 +15,7 @@ Siga essas instruções se desejar reescrever o código por si mesmo, aprendendo
 
 - Selecionar os pinos PB10 e PB11 como GPIO_EXTIxx.
 - Ir até GPIO > NVIC.
+    - Selecionar a opção "EXTI line \[15:10\] interrupts"
 
 #### Sinal de PWM
 
@@ -191,3 +192,15 @@ DRESULT USER_ioctl (
 }
 ```
 
+## Utilização dos Módulos
+
+- A comunicação com o módulo Bluetooth é feita através do canal USART, utilizando a função `HAL_UART_Receive_DMA()`, que habilita a interrupção do UART com uso de DMA. As rotinas de tratamento de interrupção são `HAL_UART_RxHalfCpltCallback` e `HAL_UART_RxCpltCallback`, que são ativadas respectivamente quando o buffer de leitura é preenchido pela metade ou preenchido completamente.
+- A comunicação com o Cartão SD é feita através do módulo SPI, através de um driver vindo da STM32CubeMX para lidar com o sistema de arquivos FATFS, juntamente com a biblioteca `fatfs_sd_card`. 
+- A escrita no display lcd é feita através da biblioteca `i2c-lcd`, pelo módulo I2C.
+- A reprodução do áudio é feita através do módulo TIM, controlando diretamente o registrador TIM1CCR1, que controla o duty-cicle do PWM.
+
+## Fluxo de Programa
+
+O fluxo do programa está mostrado no diagrama de estados a seguir:
+
+[EXPLICAÇÃO]

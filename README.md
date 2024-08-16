@@ -58,7 +58,7 @@ make
 ```bash
 sudo adduser $USER dialout
 ```
-    - Será preciso relogar para que esse comando seja efetivado
+    - *Será preciso relogar para que esse comando seja efetivado
 
 # Componentes utilizados
 
