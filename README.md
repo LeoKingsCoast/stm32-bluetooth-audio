@@ -1,8 +1,10 @@
-# Introdução 
+# Sistema de Reprodução de Audio com STM32F103C8T6 com Transferência Bluetooth e Armazenamento em SD Card
+
+## Introdução 
 
 Este é um projeto de Iniciação Científica para minha graduação. O projeto consiste em um sistema controlado por um microcontrolador STM32F103C8T6 capaz de receber arquivos de áudio por bluetooth, armazená-los em um cartão Micro SD e reproduzí-lo.
 
-# Passos para Implementação do Projeto
+## Passos para Implementação do Projeto
 
 Se você quiser fazer uma montagem funcional deste projeto para testes, siga os passos a seguir. Se desejar implementar o projeto do zero, vendo em detalhes como preparar cada componente, veja [Implementando este Projeto do Zero](FROMSCRATCH.md).
 
@@ -29,7 +31,7 @@ cd build
 st-flash --reset write Bluetooth_Audio_Player.bin 0x8000000
 ```
 
-## Testando o circuito
+### Testando o circuito
 
 - Ao apertar o botão conectado em PA10, um audio deve ser tocado caso já esteja armazenado
 
@@ -50,7 +52,7 @@ make
 
 - Nota: O processo de armazenamento dos dados no cartão SD é lento, um arquivo de áudio de 1.5s com sample rate de 22050 Hz leva cerca de 2 minutos para ser escrito. Esse tempo pode ser diminuido alterando o sample rate.
 
-## Problemas que podem ocorrer
+### Problemas que podem ocorrer
 
 - O programa que envia o áudio por bluetooth assume que o módulo foi conectado através da porta seria /dev/rfcomm0. Verifique se este é o caso. Você pode usar o comando `dmesg` após conectar o módulo bluetooth para verificar em qual porta ele foi conectado. É possível que o seu driver bluetooth também mostre essa informação dentre as propriedades do dispositivo conectado.
 
@@ -60,7 +62,7 @@ sudo adduser $USER dialout
 ```
     - *Será preciso relogar para que esse comando seja efetivado
 
-# Componentes utilizados
+## Componentes utilizados
 
 - Placa STM32 Bluepill (Microcontrolador STM32F103C8T6)
 - Módulo Micro SD
@@ -74,8 +76,9 @@ sudo adduser $USER dialout
 - Auto-falante
 - **Outros**
 
-# Esquemático e Explicação do Circuito
+## Esquemático do Circuito
 
-A seguir é mostrado o esquemático do circuito, juntamente com uma imagem do protótipo.
+A seguir é mostrado o esquemático do circuito, juntamente com uma imagem do protótipo, com as conexões nomeadas de acordo com a nomenclatura dos pinos da placa stm32 bluepill.     
 
+![2024-08-19-at-11-20-52.jpg](img/2024-08-19-at-11-20-52.jpg)
 
