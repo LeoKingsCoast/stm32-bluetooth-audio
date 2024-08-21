@@ -22,6 +22,8 @@
 #include "fatfs.h"
 #include "i2c.h"
 #include "spi.h"
+#include "stm32f103xb.h"
+#include "stm32f1xx_hal_gpio.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -146,62 +148,64 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
-    lcd_init(); 
+  lcd_init(); 
 
+  HAL_Delay(2000);
+
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+
+  lcd_clear();
+  lcd_put_cur(0,0);
+  lcd_send_string("Preparando SD");
+  HAL_Delay(2000);
+  lcd_put_cur(0,0);
+
+  do {
+    // Montando o cartão SD
+    fres = f_mount(&FatFs, "", 1);
+    if(fres != FR_OK){
+      lcd_send_string("SD Not Found");
+      Estado = IDLE;
+      break;
+    }
+    lcd_send_string("SD Mounted!");
+    HAL_Delay(2000);
+
+    // Obtendo espaço no disco
+    FATFS *pfs;
+    DWORD fre_clust;
+    uint32_t totalSpace, freeSpace;
+    f_getfree("", &fre_clust, &pfs);
+    totalSpace = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
+    freeSpace = (uint32_t)(fre_clust * pfs->csize * 0.5);
+    lcd_clear();
+    lcd_put_cur(0,0);
+    lcd_send_string("Total: ");
+    sprintf(lcd_buff, "%lu", totalSpace);
+    lcd_send_string(lcd_buff);
+    lcd_put_cur(1,0);
+    lcd_send_string("Free: ");
+    sprintf(lcd_buff, "%lu", freeSpace);
+    lcd_send_string(lcd_buff);
     HAL_Delay(2000);
 
     lcd_clear();
     lcd_put_cur(0,0);
-    lcd_send_string("Preparando SD");
-    HAL_Delay(2000);
-    lcd_put_cur(0,0);
-
-    do {
-        // Montando o cartão SD
-        fres = f_mount(&FatFs, "", 1);
-        if(fres != FR_OK){
-            lcd_send_string("SD Not Found");
-            Estado = IDLE;
-            break;
-        }
-        lcd_send_string("SD Mounted!");
-        HAL_Delay(2000);
-
-        // Obtendo espaço no disco
-        FATFS *pfs;
-        DWORD fre_clust;
-        uint32_t totalSpace, freeSpace;
-        f_getfree("", &fre_clust, &pfs);
-        totalSpace = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
-        freeSpace = (uint32_t)(fre_clust * pfs->csize * 0.5);
-        lcd_clear();
-        lcd_put_cur(0,0);
-        lcd_send_string("Total: ");
-        sprintf(lcd_buff, "%lu", totalSpace);
-        lcd_send_string(lcd_buff);
-        lcd_put_cur(1,0);
-        lcd_send_string("Free: ");
-        sprintf(lcd_buff, "%lu", freeSpace);
-        lcd_send_string(lcd_buff);
-        HAL_Delay(2000);
-
-        lcd_clear();
-        lcd_put_cur(0,0);
-        lcd_send_string("IDLE");
-        /*lcd_clear();*/
-        /*lcd_put_cur(0,0);*/
-        /*lcd_send_string("Data read:");*/
-        /*f_gets(buf, sizeof(buf), &fil);*/
-        /*lcd_put_cur(1,0);*/
-        /*lcd_send_string(buf);*/
-        /*HAL_Delay(5000);*/
+    lcd_send_string("IDLE");
+    /*lcd_clear();*/
+    /*lcd_put_cur(0,0);*/
+    /*lcd_send_string("Data read:");*/
+    /*f_gets(buf, sizeof(buf), &fil);*/
+    /*lcd_put_cur(1,0);*/
+    /*lcd_send_string(buf);*/
+    /*HAL_Delay(5000);*/
 
 
-    } while (false);
+  } while (false);
 
-    HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 
-    Estado = IDLE;
+  Estado = IDLE;
 
   /* USER CODE END 2 */
 
@@ -291,10 +295,12 @@ int main(void)
             lcd_send_string("Data read:");
             lcd_put_cur(1, 0);
             for (int i = 0; i < 29999; i++) {
+                /*HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);*/
                 f_gets(sd_read_buffer, 2, &fil); 
+                /*HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);*/
                 // 22050Hz Audio => T = 45.35us
                 TIM1->CCR1 = (uint32_t) byte_read;
-                DELAY_US(33);
+                DELAY_US(39);
 
                 //sprintf(err, "%lu", (uint32_t) byte_read);
                 //lcd_send_string(err);
