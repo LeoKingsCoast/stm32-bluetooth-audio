@@ -105,7 +105,8 @@ char lcd_buff[100];
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
+void lcd_string_top(char *);
+void lcd_string_bottom(char *);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -151,27 +152,25 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
-  lcd_init(); 
+  lcd_init();
 
   HAL_Delay(2000);
 
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
 
   lcd_clear();
-  lcd_put_cur(0,0);
-  lcd_send_string("Preparando SD");
+  lcd_string_top("Preparando SD");
   HAL_Delay(2000);
-  lcd_put_cur(0,0);
 
   do {
     // Montando o cartão SD
     fres = f_mount(&FatFs, "", 1);
     if(fres != FR_OK){
-      lcd_send_string("SD Not Found");
+      lcd_string_top("SD Not Found    ");
       Estado = IDLE;
       break;
     }
-    lcd_send_string("SD Mounted!");
+    lcd_string_top("SD Mounted!");
     HAL_Delay(2000);
 
     // Obtendo espaço no disco
@@ -181,28 +180,19 @@ int main(void)
     f_getfree("", &fre_clust, &pfs);
     totalSpace = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
     freeSpace = (uint32_t)(fre_clust * pfs->csize * 0.5);
+
+    // Escrevendo espaço no lcd
     lcd_clear();
-    lcd_put_cur(0,0);
-    lcd_send_string("Total: ");
+    lcd_string_top("Total: ");
     sprintf(lcd_buff, "%lu", totalSpace);
     lcd_send_string(lcd_buff);
-    lcd_put_cur(1,0);
-    lcd_send_string("Free: ");
+    lcd_string_bottom("Free: ");
     sprintf(lcd_buff, "%lu", freeSpace);
     lcd_send_string(lcd_buff);
     HAL_Delay(2000);
 
     lcd_clear();
-    lcd_put_cur(0,0);
-    lcd_send_string("IDLE");
-    /*lcd_clear();*/
-    /*lcd_put_cur(0,0);*/
-    /*lcd_send_string("Data read:");*/
-    /*f_gets(buf, sizeof(buf), &fil);*/
-    /*lcd_put_cur(1,0);*/
-    /*lcd_send_string(buf);*/
-    /*HAL_Delay(5000);*/
-
+    lcd_string_top("IDLE");
 
   } while (false);
 
@@ -218,126 +208,83 @@ int main(void)
   {
 
     switch (Estado) {
-        case IDLE:
-            break;
+      case IDLE:
+        break;
 
-        case ESPERA_RECEPCAO:
-            if(data_ready){
-                //HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);
-                HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
-                /*strcpy((char*)tx_buffer, "\n\rEscrita no SD:\n\r");*/
-                /*HAL_UART_Transmit(&huart2, tx_buffer, strlen((const char*)tx_buffer), 100);*/
-                /*HAL_UART_Transmit(&huart2, data_to_transfer, strlen((const char*)data_to_transfer), 100);*/
-                f_puts((const char*)data_to_transfer, &fil);
-                memset(data_to_transfer, '\0', 129);
-                //lcd_send_string((char*)rx_buffer);
-                data_ready = false;
-                /*HAL_UART_Receive_DMA(&huart1, rx_buffer, 256);*/
-            }
-            break;
+      case ESPERA_RECEPCAO:
+        if(data_ready){
+          HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+          f_puts((const char*)data_to_transfer, &fil);
+          memset(data_to_transfer, '\0', 129);
+          data_ready = false;
+        }
+        break;
 
-        case ABRE_ARQUIVO_ESCRITA:
-            // Criando o arquivo que será usado. Se o arquivo já existe, será sobreescrito.
-            fres = f_open(&fil, "Audio_teste.txt", FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
-            lcd_clear();
-            lcd_put_cur(0,0);
-            if(fres != FR_OK){
-                lcd_send_string("File not created");
-                lcd_put_cur(1,0);
-                lcd_send_string("Error ");
-                sprintf(lcd_buff, "%d", fres);
-                lcd_send_string(lcd_buff);
-                Estado = IDLE;
-                break;
-            }
-            lcd_send_string("File open!");
-            HAL_Delay(2000);
+      case ABRE_ARQUIVO_ESCRITA:
+        // Criando o arquivo que será usado. Se o arquivo já existe, será sobreescrito.
+        fres = f_open(&fil, "Audio_teste.txt", FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
+        lcd_clear();
+        if(fres != FR_OK){
+          lcd_string_top("File not created");
+          lcd_string_bottom("Error ");
+          sprintf(lcd_buff, "%d", fres);
+          lcd_send_string(lcd_buff);
+          Estado = IDLE;
+          break;
+        }
+        lcd_string_top("File open!");
+        HAL_Delay(2000);
 
-            lcd_clear();
-            lcd_put_cur(0,0);
-            lcd_send_string("Esperando...");
-            lcd_put_cur(1,0);
-            Estado = ESPERA_RECEPCAO;
+        lcd_clear();
+        lcd_string_top("Esperando...");
+        Estado = ESPERA_RECEPCAO;
 
-            HAL_UART_Receive_DMA(&huart1, rx_buffer, 256);
-            break;
+        HAL_UART_Receive_DMA(&huart1, rx_buffer, 256);
+        break;
 
-        case ABRE_ARQUIVO_LEITURA:
-            // Abrindo o arquivo de audio
-            fres = f_open(&fil, "Audio_teste.txt", FA_READ);
-            if (fres != FR_OK) {
-                lcd_clear();
-                lcd_put_cur(0,0);
-                lcd_send_string("File not read");
-                lcd_put_cur(1,0);
-                lcd_send_string("Error ");
-                sprintf(lcd_buff, "%d", fres);
-                lcd_send_string(lcd_buff);
-                Estado = IDLE;
-                break;
-            }
-            /*fres = f_open(&fil, "Audio.txt", FA_WRITE | FA_READ | FA_CREATE_ALWAYS);*/
-            /*lcd_clear();*/
-            /*lcd_put_cur(0,0);*/
-            /*if(fres != FR_OK){*/
-            /*    lcd_send_string("File not created");*/
-            /*    lcd_put_cur(1,0);*/
-            /*    lcd_send_string("Error ");*/
-            /*    sprintf(err, "%d", fres);*/
-            /*    lcd_send_string(err);*/
-            /*    Estado = IDLE;*/
-            /*    break;*/
-            /*}*/
-            lcd_clear();
-            lcd_put_cur(0,0);
-            lcd_send_string("File open!");
-            HAL_Delay(2000);
-            file_size = f_size(&fil);
+      case ABRE_ARQUIVO_LEITURA:
+        // Abrindo o arquivo de audio
+        fres = f_open(&fil, "Audio_teste.txt", FA_READ);
+        if (fres != FR_OK) {
+          lcd_clear();
+          lcd_string_top("File not read");
+          lcd_string_bottom("Error ");
+          sprintf(lcd_buff, "%d", fres);
+          lcd_send_string(lcd_buff);
+          Estado = IDLE;
+          break;
+        }
+        lcd_clear();
+        lcd_string_top("File open!");
+        HAL_Delay(2000);
+        file_size = f_size(&fil);
 
-            lcd_clear();
-            lcd_put_cur(0,0);
-            lcd_send_string("Data read:");
-            lcd_put_cur(1, 0);
-            for (int i = 0; i < file_size; i++) {
-                /*HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);*/
-                f_gets(sd_read_buffer, 2, &fil); 
-                /*HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);*/
-                // 22050Hz Audio => T = 45.35us
-                TIM1->CCR1 = (uint32_t) byte_read;
-                DELAY_US(39);
+        lcd_string_top("Playing...");
+        for (int i = 0; i < file_size; i++) {
+          f_gets(sd_read_buffer, 2, &fil); 
+          TIM1->CCR1 = (uint32_t) byte_read; // 22050Hz Audio => T = 45.35us
+          DELAY_US(39);
+        }
+        TIM1->CCR1 = 0; 
+        HAL_Delay(1000);
 
-                //sprintf(err, "%lu", (uint32_t) byte_read);
-                //lcd_send_string(err);
-                //HAL_Delay(500);
-            }
-            TIM1->CCR1 = 0; 
-            /*f_gets(buf, sizeof(buf), &fil);*/
-            /*lcd_put_cur(1,0);*/
-            /*lcd_send_string(buf);*/
-            /*HAL_Delay(1000);*/
-            /*f_gets(buf, sizeof(buf), &fil);*/
-            /*lcd_send_string(buf);*/
-            HAL_Delay(1000);
+        Estado = FECHA_ARQUIVO;
+        break;
 
-            Estado = FECHA_ARQUIVO;
-            break;
+      case FECHA_ARQUIVO:
+        lcd_clear();
+        lcd_string_top("Closing file...");
+        HAL_Delay(2000);
+        f_close(&fil);
 
-        case FECHA_ARQUIVO:
-            lcd_clear();
-            lcd_put_cur(0,0);
-            lcd_send_string("Closing file...");
-            HAL_Delay(2000);
-            f_close(&fil);
+        lcd_clear();
+        lcd_string_top("IDLE");
 
-            lcd_clear();
-            lcd_put_cur(0,0);
-            lcd_send_string("IDLE");
+        Estado = IDLE;
+        break;
 
-            Estado = IDLE;
-            break;
-
-        case TOCA_AUDIO:
-            break;
+      case TOCA_AUDIO:
+        break;
     }
     /* USER CODE END WHILE */
 
@@ -400,9 +347,7 @@ void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart){
     SizeRead = true;
   }
   else {
-    /*memcpy(tx_buffer, rx_buffer, 256);*/
     memcpy(data_to_transfer, rx_buffer, 128);
-    /*memset(tx_buffer, '\0', 256);*/
     memset(rx_buffer, '\0', 128);
     data_ready = true;
   }
@@ -413,15 +358,7 @@ void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart){
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
     /*UNUSED(huart);*/
 
-    //f_puts((const char*)rx_buffer, &fil);
-    //f_write(&fil, rx_buffer, strlen((char*)rx_buffer), &WWC);
-    //lcd_send_string((char*)rx_buffer);
-    /*memcpy(tx_buffer, rx_buffer, 256);*/
-    /*strcpy((char*)tx_buffer, "\n\rComplete callback: \n\r");*/
-    /*HAL_UART_Transmit(&huart2, tx_buffer, strlen((const char*)tx_buffer), 100);*/
-    /*HAL_UART_Transmit(&huart2, rx_buffer, 256, 100);*/
     memcpy(data_to_transfer, rx_buffer + 128, 128);
-    /*memset(tx_buffer, '\0', 256);*/
     memset(rx_buffer + 128, '\0', 128);
     data_ready = true;
     HTC = 0;
@@ -447,6 +384,16 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 
     previousMillis = currentMillis;
 
+}
+
+void lcd_string_top(char * str){
+  lcd_put_cur(0, 0);
+  lcd_send_string(str);
+}
+
+void lcd_string_bottom(char * str){
+  lcd_put_cur(1, 0);
+  lcd_send_string(str);
 }
 
 /* USER CODE END 4 */
