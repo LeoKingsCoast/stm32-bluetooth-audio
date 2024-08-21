@@ -20,7 +20,9 @@
 #include "main.h"
 #include "dma.h"
 #include "fatfs.h"
+#include "ff.h"
 #include "i2c.h"
+#include "integer.h"
 #include "spi.h"
 #include "stm32f103xb.h"
 #include "stm32f1xx_hal_gpio.h"
@@ -94,6 +96,7 @@ FIL         fil;                  //File handle
 FRESULT     fres;                 //Result after operations
 UINT        WWC;
 char        buf[5];
+DWORD       file_size;
 
 char lcd_buff[100];
 
@@ -289,12 +292,13 @@ int main(void)
             lcd_put_cur(0,0);
             lcd_send_string("File open!");
             HAL_Delay(2000);
+            file_size = f_size(&fil);
 
             lcd_clear();
             lcd_put_cur(0,0);
             lcd_send_string("Data read:");
             lcd_put_cur(1, 0);
-            for (int i = 0; i < 29999; i++) {
+            for (int i = 0; i < file_size; i++) {
                 /*HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_SET);*/
                 f_gets(sd_read_buffer, 2, &fil); 
                 /*HAL_GPIO_WritePin(GPIOC, GPIO_PIN_13, GPIO_PIN_RESET);*/
