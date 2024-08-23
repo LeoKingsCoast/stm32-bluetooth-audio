@@ -47,15 +47,7 @@
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 
-#define IDLE                    0
-#define ABRE_ARQUIVO_ESCRITA    1
-#define ESPERA_RECEPCAO         2
-#define FECHA_ARQUIVO           3
-#define ABRE_ARQUIVO_LEITURA    4
-#define TOCA_AUDIO              5
-
 #define DATA_BUFFER_SIZE        128
-/*#define DUTY_CICLE_MULTIPLIER   16*/
 #define DUTY_CICLE_MULTIPLIER   ((TIM1->ARR)/256)
 
 // Macros for us delay found on: https://deepbluembedded.com/stm32-systick-timer-microseconds-delay-us-delay-function/
@@ -84,10 +76,16 @@ uint8_t rx_buffer[2*DATA_BUFFER_SIZE];
 uint8_t data_to_transfer[DATA_BUFFER_SIZE + 1];
 bool data_ready = false;
 
-uint8_t tx_buffer[256]; // For debugging
-
 uint32_t currentMillis, previousMillis;
-uint8_t Estado;
+/*uint8_t Estado;*/
+enum state {
+  IDLE,
+  ABRE_ARQUIVO_ESCRITA,
+  ESPERA_RECEPCAO,
+  FECHA_ARQUIVO,
+  ABRE_ARQUIVO_LEITURA,
+  TOCA_AUDIO
+} Estado;
 
 char byte_read;
 char *sd_read_buffer = &byte_read;
@@ -95,8 +93,6 @@ char *sd_read_buffer = &byte_read;
 FATFS       FatFs;                //Fatfs handle
 FIL         fil;                  //File handle
 FRESULT     fres;                 //Result after operations
-UINT        WWC;
-char        buf[5];
 DWORD       file_size;
 
 char lcd_buff[100];
