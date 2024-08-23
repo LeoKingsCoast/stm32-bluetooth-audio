@@ -22,6 +22,7 @@
 #include "fatfs.h"
 #include "i2c.h"
 #include "spi.h"
+#include "stm32f103xb.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -53,6 +54,10 @@
 #define ABRE_ARQUIVO_LEITURA    4
 #define TOCA_AUDIO              5
 
+#define DATA_BUFFER_SIZE        128
+/*#define DUTY_CICLE_MULTIPLIER   16*/
+#define DUTY_CICLE_MULTIPLIER   ((TIM1->ARR)/256)
+
 // Macros for us delay found on: https://deepbluembedded.com/stm32-systick-timer-microseconds-delay-us-delay-function/
 #define SYSTICK_LOAD (SystemCoreClock/1000000U)
 #define SYSTICK_DELAY_CALIB (SYSTICK_LOAD >> 1)
@@ -75,8 +80,8 @@
 
 /* USER CODE BEGIN PV */
 
-uint8_t rx_buffer[256];
-uint8_t data_to_transfer[129];
+uint8_t rx_buffer[2*DATA_BUFFER_SIZE];
+uint8_t data_to_transfer[DATA_BUFFER_SIZE + 1];
 bool data_ready = false;
 
 uint8_t tx_buffer[256]; // For debugging
@@ -211,7 +216,7 @@ int main(void)
         if(data_ready){
           HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
           f_puts((const char*)data_to_transfer, &fil);
-          memset(data_to_transfer, '\0', 129);
+          memset(data_to_transfer, '\0', DATA_BUFFER_SIZE + 1);
           data_ready = false;
         }
         break;
@@ -235,7 +240,7 @@ int main(void)
         lcd_string_top("Esperando...");
         Estado = ESPERA_RECEPCAO;
 
-        HAL_UART_Receive_DMA(&huart1, rx_buffer, 256);
+        HAL_UART_Receive_DMA(&huart1, rx_buffer, 2*DATA_BUFFER_SIZE);
         break;
 
       case ABRE_ARQUIVO_LEITURA:
@@ -258,7 +263,7 @@ int main(void)
         lcd_string_top("Playing...");
         for (int i = 0; i < file_size; i++) {
           f_gets(sd_read_buffer, 2, &fil); 
-          TIM1->CCR1 = 16 * ((uint32_t) byte_read); // 22050Hz Audio => T = 45.35us
+          TIM1->CCR1 = DUTY_CICLE_MULTIPLIER * ((uint32_t) byte_read); // 22050Hz Audio => T = 45.35us
           DELAY_US(39);
         }
         TIM1->CCR1 = 0; 
@@ -334,7 +339,6 @@ int HTC = 0, FTC = 0;
 int indx = 0;
 
 bool SizeRead = true;
-uint32_t file_size = 0;
 
 void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart){
   if (!SizeRead) {
@@ -343,8 +347,8 @@ void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart){
     SizeRead = true;
   }
   else {
-    memcpy(data_to_transfer, rx_buffer, 128);
-    memset(rx_buffer, '\0', 128);
+    memcpy(data_to_transfer, rx_buffer, DATA_BUFFER_SIZE);
+    memset(rx_buffer, '\0', DATA_BUFFER_SIZE);
     data_ready = true;
   }
   HTC = 1;
@@ -354,8 +358,8 @@ void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart){
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
     /*UNUSED(huart);*/
 
-    memcpy(data_to_transfer, rx_buffer + 128, 128);
-    memset(rx_buffer + 128, '\0', 128);
+    memcpy(data_to_transfer, rx_buffer + DATA_BUFFER_SIZE, DATA_BUFFER_SIZE);
+    memset(rx_buffer + DATA_BUFFER_SIZE, '\0', DATA_BUFFER_SIZE);
     data_ready = true;
     HTC = 0;
     FTC = 1;
