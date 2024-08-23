@@ -20,12 +20,8 @@
 #include "main.h"
 #include "dma.h"
 #include "fatfs.h"
-#include "ff.h"
 #include "i2c.h"
-#include "integer.h"
 #include "spi.h"
-#include "stm32f103xb.h"
-#include "stm32f1xx_hal_gpio.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
@@ -262,7 +258,7 @@ int main(void)
         lcd_string_top("Playing...");
         for (int i = 0; i < file_size; i++) {
           f_gets(sd_read_buffer, 2, &fil); 
-          TIM1->CCR1 = (uint32_t) byte_read; // 22050Hz Audio => T = 45.35us
+          TIM1->CCR1 = 16 * ((uint32_t) byte_read); // 22050Hz Audio => T = 45.35us
           DELAY_US(39);
         }
         TIM1->CCR1 = 0; 
