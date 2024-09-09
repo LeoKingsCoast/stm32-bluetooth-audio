@@ -22,7 +22,6 @@
 #include "fatfs.h"
 #include "i2c.h"
 #include "spi.h"
-#include "stm32f103xb.h"
 #include "tim.h"
 #include "usart.h"
 #include "gpio.h"
