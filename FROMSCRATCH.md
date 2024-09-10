@@ -1,6 +1,6 @@
 # Implementando este Projeto do Zero
 
-Siga essas instruções se desejar reescrever o código por si mesmo, aprendendo sobre o funcionamento de cada parte do projeto.
+Siga essas instruções se desejar implementar o projeto por si mesmo ou entender detalhes de como foi feito.
 
 ## Configuração Inicial
 
@@ -23,7 +23,7 @@ Siga essas instruções se desejar reescrever o código por si mesmo, aprendendo
 - Configurações TIM1:
     - **Clock Source:** Internal Clock
     - **Channel1**: PWM Generation CH1
-    - **Counter Period:** 8192
+    - **Counter Period:** 1024
 
 #### Cartão SD
 
