@@ -199,8 +199,4 @@ DRESULT USER_ioctl (
 - A escrita no display lcd é feita através da biblioteca `i2c-lcd`, pelo módulo I2C.
 - A reprodução do áudio é feita através do módulo TIM, controlando diretamente o registrador TIM1CCR1, que controla o duty-cicle do PWM.
 
-## Fluxo de Programa
-
-O fluxo do programa está mostrado no diagrama de estados a seguir:
-
-[EXPLICAÇÃO]
+Após a preparação mostrada acima, o resto do projeto pode ser reproduzido copiando os conteúdos de `main.c`

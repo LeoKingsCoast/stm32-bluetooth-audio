@@ -1,2 +1,4 @@
 .cache/
 build/
+envioSerial/audio*
+envioSerial/envioSerial

@@ -16,7 +16,7 @@ Se você quiser fazer uma montagem funcional deste projeto para testes, siga os 
 
 - Clone este repositório para sua máquina:
 ```bash
-git clone
+git clone https://github.com/LeoKingsCoast/stm32-bluetooth-audio
 ```
 
 - Siga os passos [aqui](https://github.com/LeoKingsCoast/stm32-linux-setup) para obter os programas necessários para fazer o upload do código para o microcontrolador.
@@ -50,7 +50,7 @@ make
 
 - Se não tiver feito ainda, conecte o módulo bluetooth ao seu computador da mesma forma que qualquer outro dispositivo bluetooth. Se a conexão tiver sido bem sucedida, o LED do módulo irá parar de piscar.
 
-- Execute o programa e espere o envio terminar. Após o término do envio, aperte novamente o botão conectado ao PA11 para voltar ao estado normal do STM32. Não aperte o botão PA11 novamente até que o LED PC13 (embutido na placa Bluepill) pare de piscar, ele indica que os dados ainda estão sendo enviados pelo módulo bluetooth e escritos no cartão SD. Se o botão for apertado antes disso, o audio terá uma porção cortada.
+- Execute o programa (rodando `./envioSerial`) e espere o envio terminar. Após o término do envio, aperte novamente o botão conectado ao PA11 para voltar ao estado normal do STM32. Não aperte o botão PA11 novamente até que o LED PC13 (embutido na placa Bluepill) pare de piscar, ele indica que os dados ainda estão sendo enviados pelo módulo bluetooth e escritos no cartão SD. Se o botão for apertado antes disso, o audio terá uma porção cortada.
 
 - Nota: O processo de armazenamento dos dados no cartão SD é lento, um arquivo de áudio de 1.5s com sample rate de 22050 Hz leva cerca de 2 minutos para ser escrito. Esse tempo pode ser diminuido alterando o sample rate.
 
