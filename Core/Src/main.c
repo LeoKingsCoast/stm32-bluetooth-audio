@@ -82,7 +82,6 @@ enum state {
   ABRE_ARQUIVO_ESCRITA,
   ESPERA_RECEPCAO,
   FECHA_ARQUIVO,
-  ABRE_ARQUIVO_LEITURA,
   TOCA_AUDIO
 } Estado;
 
@@ -238,7 +237,7 @@ int main(void)
         HAL_UART_Receive_DMA(&huart1, rx_buffer, 2*DATA_BUFFER_SIZE);
         break;
 
-      case ABRE_ARQUIVO_LEITURA:
+      case TOCA_AUDIO:
         // Abrindo o arquivo de audio
         fres = f_open(&fil, "Audio_teste.txt", FA_READ);
         if (fres != FR_OK) {
@@ -277,9 +276,6 @@ int main(void)
         lcd_string_top("IDLE");
 
         Estado = IDLE;
-        break;
-
-      case TOCA_AUDIO:
         break;
     }
     /* USER CODE END WHILE */
@@ -330,34 +326,17 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
-int HTC = 0, FTC = 0;
-int indx = 0;
-
-bool SizeRead = true;
-
 void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart){
-  if (!SizeRead) {
-    // size reading script
-    indx += 124;
-    SizeRead = true;
-  }
-  else {
     memcpy(data_to_transfer, rx_buffer, DATA_BUFFER_SIZE);
     memset(rx_buffer, '\0', DATA_BUFFER_SIZE);
     data_ready = true;
-  }
-  HTC = 1;
-  FTC = 0;
 }
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart){
     /*UNUSED(huart);*/
-
     memcpy(data_to_transfer, rx_buffer + DATA_BUFFER_SIZE, DATA_BUFFER_SIZE);
     memset(rx_buffer + DATA_BUFFER_SIZE, '\0', DATA_BUFFER_SIZE);
     data_ready = true;
-    HTC = 0;
-    FTC = 1;
 }
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
@@ -365,7 +344,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 
     if(GPIO_Pin == GPIO_PIN_10 && (currentMillis - previousMillis > 1000)){
         if(Estado == IDLE){
-            Estado = ABRE_ARQUIVO_LEITURA;
+            Estado = TOCA_AUDIO;
         }
     }
     else if(GPIO_Pin == GPIO_PIN_11 && (currentMillis - previousMillis > 1000)){
