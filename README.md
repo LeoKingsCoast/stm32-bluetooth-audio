@@ -54,6 +54,10 @@ make
 
 - Nota: O processo de armazenamento dos dados no cartão SD é lento, um arquivo de áudio de 1.5s com sample rate de 22050 Hz leva cerca de 2 minutos para ser escrito. Esse tempo pode ser diminuido alterando o sample rate.
 
+O functionamento descrito acima pode ser visualizado no diagrama de estados abaixo.
+
+![diagrama-de-estados](img/estados.jpg) 
+
 ### Problemas que podem ocorrer
 
 - O programa que envia o áudio por bluetooth assume que o módulo foi conectado através da porta seria /dev/rfcomm0. Verifique se este é o caso. Você pode usar o comando `dmesg` após conectar o módulo bluetooth para verificar em qual porta ele foi conectado. É possível que o seu driver bluetooth também mostre essa informação dentre as propriedades do dispositivo conectado.
