@@ -71,6 +71,8 @@
 
 /* USER CODE BEGIN PV */
 
+FATFS FatFs; // Definição do formato de arquivo FatFs
+
 uint8_t rx_buffer[2*DATA_BUFFER_SIZE];
 uint8_t data_to_transfer[DATA_BUFFER_SIZE + 1];
 bool data_ready = false;
@@ -82,26 +84,28 @@ enum state {
   ABRE_ARQUIVO_ESCRITA,
   ESPERA_RECEPCAO,
   FECHA_ARQUIVO,
-  TOCA_AUDIO
+  TOCA_AUDIO,
+  ERRO
 } Estado;
-
-char byte_read;
-char *sd_read_buffer = &byte_read;
-
-FATFS       FatFs;                //Fatfs handle
-FIL         fil;                  //File handle
-FRESULT     fres;                 //Result after operations
-DWORD       file_size;
-
-char lcd_buff[100];
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
+
+// funções de controle do LCD
 void lcd_string_top(char *);
 void lcd_string_bottom(char *);
+
+// funções de controle do SD Card
+int SD_Mount();
+void SD_Read_Size();
+void SD_error_feedback(FRESULT);
+
+// função para reprodução do áudio
+void tocaAudio(FIL *file_ptr);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -148,52 +152,32 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   lcd_init();
-
   HAL_Delay(2000);
 
-  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, GPIO_PIN_5, GPIO_PIN_RESET); // pino B5 conectado ao !Enable do amplificador LM4818
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
 
   lcd_clear();
-  lcd_string_top("Preparando SD");
+  lcd_string_top("Montando SD");
   HAL_Delay(2000);
 
-  do {
-    // Montando o cartão SD
-    fres = f_mount(&FatFs, "", 1);
-    if(fres != FR_OK){
-      lcd_string_top("SD Not Found    ");
-      Estado = IDLE;
-      break;
-    }
+  if(SD_Mount() == 1){
     lcd_string_top("SD Mounted!");
     HAL_Delay(2000);
 
-    // Obtendo espaço no disco
-    FATFS *pfs;
-    DWORD fre_clust;
-    uint32_t totalSpace, freeSpace;
-    f_getfree("", &fre_clust, &pfs);
-    totalSpace = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
-    freeSpace = (uint32_t)(fre_clust * pfs->csize * 0.5);
+    //SD_Read_Size();
 
-    // Escrevendo espaço no lcd
-    lcd_clear();
-    lcd_string_top("Total: ");
-    sprintf(lcd_buff, "%lu", totalSpace);
-    lcd_send_string(lcd_buff);
-    lcd_string_bottom("Free: ");
-    sprintf(lcd_buff, "%lu", freeSpace);
-    lcd_send_string(lcd_buff);
-    HAL_Delay(2000);
-
+    Estado = IDLE;
     lcd_clear();
     lcd_string_top("IDLE");
+  }
+  else{
+    lcd_string_top("SD Not Found    ");
+    Estado = ERRO;
+  }
 
-  } while (false);
-
-  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
-
-  Estado = IDLE;
+  FIL fil; // Variável para armazenar os arquivos
+  FRESULT fres; // Variável para armazenar feedback dos comandos para o cartão SD
 
   /* USER CODE END 2 */
 
@@ -204,11 +188,12 @@ int main(void)
 
     switch (Estado) {
       case IDLE:
+      case ERRO:
         break;
 
       case ESPERA_RECEPCAO:
         if(data_ready){
-          HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13);
+          // HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13); // LED 13
           f_puts((const char*)data_to_transfer, &fil);
           memset(data_to_transfer, '\0', DATA_BUFFER_SIZE + 1);
           data_ready = false;
@@ -220,52 +205,40 @@ int main(void)
         fres = f_open(&fil, "Audio_teste.txt", FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
         lcd_clear();
         if(fres != FR_OK){
-          lcd_string_top("File not created");
-          lcd_string_bottom("Error ");
-          sprintf(lcd_buff, "%d", fres);
-          lcd_send_string(lcd_buff);
-          Estado = IDLE;
+          SD_error_feedback(fres);
+          Estado = ERRO;
           break;
         }
         lcd_string_top("File open!");
         HAL_Delay(2000);
 
+        HAL_UART_Receive_DMA(&huart1, rx_buffer, 2*DATA_BUFFER_SIZE);
         lcd_clear();
         lcd_string_top("Esperando...");
         Estado = ESPERA_RECEPCAO;
-
-        HAL_UART_Receive_DMA(&huart1, rx_buffer, 2*DATA_BUFFER_SIZE);
         break;
 
       case TOCA_AUDIO:
-        // Abrindo o arquivo de audio
+        // Abrindo o arquivo de áudio
         fres = f_open(&fil, "Audio_teste.txt", FA_READ);
+        lcd_clear();
         if (fres != FR_OK) {
-          lcd_clear();
-          lcd_string_top("File not read");
-          lcd_string_bottom("Error ");
-          sprintf(lcd_buff, "%d", fres);
-          lcd_send_string(lcd_buff);
-          Estado = IDLE;
+          SD_error_feedback(fres);
+          Estado = ERRO;
           break;
         }
-        lcd_clear();
         lcd_string_top("File open!");
         HAL_Delay(2000);
-        file_size = f_size(&fil);
 
-        lcd_string_top("Playing...");
-        for (int i = 0; i < file_size; i++) {
-          f_gets(sd_read_buffer, 2, &fil); 
-          TIM1->CCR1 = DUTY_CICLE_MULTIPLIER * ((uint32_t) byte_read); // 22050Hz Audio => T = 45.35us
-          DELAY_US(39);
-        }
-        TIM1->CCR1 = 0; 
+        // tocando o áudio
+        tocaAudio(&fil);
         HAL_Delay(1000);
 
         Estado = FECHA_ARQUIVO;
         break;
 
+      // O estado FECHA_ARQUIVO poderia ser uma função. Mas ao escrever, achei melhor fazer um estado para 
+      // melhor integrar com a interrupção do botão 11 ao fechar o arquivo após receber o áudio por bluetooth
       case FECHA_ARQUIVO:
         lcd_clear();
         lcd_string_top("Closing file...");
@@ -326,6 +299,8 @@ void SystemClock_Config(void)
 
 /* USER CODE BEGIN 4 */
 
+// ======================= Interrupções =======================
+
 void HAL_UART_RxHalfCpltCallback(UART_HandleTypeDef *huart){
     memcpy(data_to_transfer, rx_buffer, DATA_BUFFER_SIZE);
     memset(rx_buffer, '\0', DATA_BUFFER_SIZE);
@@ -359,6 +334,9 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
     previousMillis = currentMillis;
 
 }
+// ============================================================
+
+// ============== Funções de Controle do LCD ==================
 
 void lcd_string_top(char * str){
   lcd_put_cur(0, 0);
@@ -368,6 +346,69 @@ void lcd_string_top(char * str){
 void lcd_string_bottom(char * str){
   lcd_put_cur(1, 0);
   lcd_send_string(str);
+}
+
+// ============================================================
+
+// ============= Funções de controle do SD Card ==============
+int SD_Mount(){
+  FRESULT fres; // Variável para armazenar feedback dos comandos para o cartão SD
+
+  // Montando o cartão SD
+  fres = f_mount(&FatFs, "", 1);
+  if(fres != FR_OK){
+    return 0;
+  }
+
+  return 1;
+}
+
+void SD_Read_Size(){
+    // Obtendo espaço no disco
+    FATFS *pfs;
+    DWORD fre_clust;
+    uint32_t totalSpace, freeSpace;
+    f_getfree("", &fre_clust, &pfs);
+    totalSpace = (uint32_t)((pfs->n_fatent - 2) * pfs->csize * 0.5);
+    freeSpace = (uint32_t)(fre_clust * pfs->csize * 0.5);
+
+    char lcd_buff[100];
+
+    // Escrevendo espaço no lcd
+    lcd_clear();
+    lcd_string_top("Total: ");
+    sprintf(lcd_buff, "%lu", totalSpace);
+    lcd_send_string(lcd_buff);
+    lcd_string_bottom("Free: ");
+    sprintf(lcd_buff, "%lu", freeSpace);
+    lcd_send_string(lcd_buff);
+    HAL_Delay(2000);
+}
+
+void SD_error_feedback(FRESULT fres){
+  char lcd_buff[100];
+
+  lcd_string_top("Error in file");
+  lcd_string_bottom("handling.Code:");
+  sprintf(lcd_buff, "%d", fres);
+  lcd_send_string(lcd_buff);
+}
+
+// ============================================================
+//
+void tocaAudio(FIL *file_ptr){
+  DWORD file_size;
+  file_size = f_size(file_ptr);
+  char byte_read;
+  char *sd_read_buffer = &byte_read;
+
+  lcd_string_top("Playing...");
+  for (int i = 0; i < file_size; i++) {
+    f_gets(sd_read_buffer, 2, file_ptr); // lê um byte do arquivo no SD card
+    TIM1->CCR1 = DUTY_CICLE_MULTIPLIER * ((uint32_t) byte_read); // Escreve o byte no registrador do duty cicle. Áudio de 22050Hz => T = 45.35us
+    DELAY_US(39); // Delay de aproximadamente 5 us da leitura do cartão SD
+  }
+  TIM1->CCR1 = 0; // Interrompe o PWM
 }
 
 /* USER CODE END 4 */
