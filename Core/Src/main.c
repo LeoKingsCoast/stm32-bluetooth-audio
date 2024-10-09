@@ -49,7 +49,7 @@
 #define DATA_BUFFER_SIZE        128
 #define DUTY_CICLE_MULTIPLIER   ((TIM1->ARR)/256)
 
-// Macros for us delay found on: https://deepbluembedded.com/stm32-systick-timer-microseconds-delay-us-delay-function/
+// Macros para delay de microsegundos, obtidas de: https://deepbluembedded.com/stm32-systick-timer-microseconds-delay-us-delay-function/
 #define SYSTICK_LOAD (SystemCoreClock/1000000U)
 #define SYSTICK_DELAY_CALIB (SYSTICK_LOAD >> 1)
  
