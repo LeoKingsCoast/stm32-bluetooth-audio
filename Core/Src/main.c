@@ -231,7 +231,9 @@ int main(void)
         HAL_Delay(2000);
 
         // tocando o áudio
+        HAL_TIM_Base_Start_IT(&htim1);
         tocaAudio(&fil);
+        HAL_TIM_Base_Stop_IT(&htim1);
         HAL_Delay(1000);
 
         Estado = FECHA_ARQUIVO;
@@ -334,6 +336,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
     previousMillis = currentMillis;
 
 }
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
+  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13); // LED 13
+}
+
 // ============================================================
 
 // ============== Funções de Controle do LCD ==================
