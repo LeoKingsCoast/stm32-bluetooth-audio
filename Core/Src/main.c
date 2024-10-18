@@ -35,6 +35,7 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include "circ_buffer.h"
 
 /* USER CODE END Includes */
 
@@ -76,6 +77,9 @@ FATFS FatFs; // Definição do formato de arquivo FatFs
 uint8_t rx_buffer[2*DATA_BUFFER_SIZE];
 uint8_t data_to_transfer[DATA_BUFFER_SIZE + 1];
 bool data_ready = false;
+
+char audio_byte;
+CircBuffer audioBuffer;
 
 uint32_t currentMillis, previousMillis;
 /*uint8_t Estado;*/
@@ -179,6 +183,8 @@ int main(void)
   FIL fil; // Variável para armazenar os arquivos
   FRESULT fres; // Variável para armazenar feedback dos comandos para o cartão SD
 
+  InitCircBuffer(&audioBuffer, 400);
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -230,10 +236,34 @@ int main(void)
         lcd_string_top("File open!");
         HAL_Delay(2000);
 
+        char byte_read;
+        CircBufferReset(&audioBuffer);
+        int counter = 0;
+        for (counter = 0; counter < 300; counter++) {
+          f_gets(&byte_read, 2, &fil); // lê um byte do arquivo no SD card
+          CircBufferInsert(&audioBuffer, byte_read);
+        }
+
+        /*lcd_put_cur(1, 0);*/
+        DWORD file_size = f_size(&fil); 
+        /*for(int i = 0; i < file_size; i++){*/
+        /*  CircBufferPop(&audioBuffer, &byte_read);*/
+        /*  lcd_send_data(byte_read);*/
+        /*}*/
+
         // tocando o áudio
         HAL_TIM_Base_Start_IT(&htim1);
-        tocaAudio(&fil);
+        while(counter < file_size){
+          if(!CircBufferIsFull(&audioBuffer)){
+            f_gets(&byte_read, 2, &fil); // lê um byte do arquivo no SD card
+            CircBufferInsert(&audioBuffer, byte_read);
+            counter++;
+          }
+        }
+        // tocaAudio(&fil);
+        TIM1->CCR1 = 0; // Interrompe o PWM
         HAL_TIM_Base_Stop_IT(&htim1);
+
         HAL_Delay(1000);
 
         Estado = FECHA_ARQUIVO;
@@ -339,6 +369,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
   HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13); // LED 13
+  CircBufferPop(&audioBuffer, &audio_byte);
+  TIM1->CCR1 = DUTY_CICLE_MULTIPLIER * ((uint32_t) audio_byte); // Escreve o byte no registrador do duty cicle. Áudio de 22050Hz => T = 45.35us
 }
 
 // ============================================================

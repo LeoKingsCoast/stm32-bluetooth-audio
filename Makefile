@@ -47,6 +47,7 @@ Core/Src/stm32f1xx_it.c \
 Core/Src/stm32f1xx_hal_msp.c \
 Core/Src/fatfs_sd_card.c \
 Core/Src/i2c-lcd.c \
+Core/Src/circ_buffer.c \
 FATFS/App/fatfs.c \
 FATFS/Target/user_diskio.c \
 Drivers/STM32F1xx_HAL_Driver/Src/stm32f1xx_hal_gpio_ex.c \
