@@ -61,6 +61,8 @@
          while((start - SysTick->VAL) < ticks); \
     } while (0)
 
+#define AUDIO_BUFFER_SIZE 400
+
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -183,7 +185,7 @@ int main(void)
   FIL fil; // Variável para armazenar os arquivos
   FRESULT fres; // Variável para armazenar feedback dos comandos para o cartão SD
 
-  InitCircBuffer(&audioBuffer, 400);
+  InitCircBuffer(&audioBuffer, AUDIO_BUFFER_SIZE);
 
   /* USER CODE END 2 */
 
@@ -236,33 +238,7 @@ int main(void)
         lcd_string_top("File open!");
         HAL_Delay(2000);
 
-        char byte_read;
-        CircBufferReset(&audioBuffer);
-        int counter = 0;
-        for (counter = 0; counter < 300; counter++) {
-          f_gets(&byte_read, 2, &fil); // lê um byte do arquivo no SD card
-          CircBufferInsert(&audioBuffer, byte_read);
-        }
-
-        /*lcd_put_cur(1, 0);*/
-        DWORD file_size = f_size(&fil); 
-        /*for(int i = 0; i < file_size; i++){*/
-        /*  CircBufferPop(&audioBuffer, &byte_read);*/
-        /*  lcd_send_data(byte_read);*/
-        /*}*/
-
-        // tocando o áudio
-        HAL_TIM_Base_Start_IT(&htim1);
-        while(counter < file_size){
-          if(!CircBufferIsFull(&audioBuffer)){
-            f_gets(&byte_read, 2, &fil); // lê um byte do arquivo no SD card
-            CircBufferInsert(&audioBuffer, byte_read);
-            counter++;
-          }
-        }
-        // tocaAudio(&fil);
-        TIM1->CCR1 = 0; // Interrompe o PWM
-        HAL_TIM_Base_Stop_IT(&htim1);
+        tocaAudio(&fil);
 
         HAL_Delay(1000);
 
@@ -367,10 +343,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
 
 }
 
+// Interrupção ativada a cada T = 45.35us quando a função tocaAudio() está em operação
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim){
-  HAL_GPIO_TogglePin(GPIOC, GPIO_PIN_13); // LED 13
+  // Escreve o byte no registrador do duty cicle. Áudio de 22050Hz => T = 45.35us
   CircBufferPop(&audioBuffer, &audio_byte);
-  TIM1->CCR1 = DUTY_CICLE_MULTIPLIER * ((uint32_t) audio_byte); // Escreve o byte no registrador do duty cicle. Áudio de 22050Hz => T = 45.35us
+  TIM1->CCR1 = DUTY_CICLE_MULTIPLIER * ((uint32_t) audio_byte);
 }
 
 // ============================================================
@@ -436,18 +413,29 @@ void SD_error_feedback(FRESULT fres){
 // ============================================================
 //
 void tocaAudio(FIL *file_ptr){
-  DWORD file_size;
-  file_size = f_size(file_ptr);
   char byte_read;
-  char *sd_read_buffer = &byte_read;
+  CircBufferReset(&audioBuffer);
+  int counter = 0;
 
-  lcd_string_top("Playing...");
-  for (int i = 0; i < file_size; i++) {
-    f_gets(sd_read_buffer, 2, file_ptr); // lê um byte do arquivo no SD card
-    TIM1->CCR1 = DUTY_CICLE_MULTIPLIER * ((uint32_t) byte_read); // Escreve o byte no registrador do duty cicle. Áudio de 22050Hz => T = 45.35us
-    DELAY_US(39); // Delay de aproximadamente 5 us da leitura do cartão SD
+  // Enche o buffer de áudio inicialmente
+  for (counter = 0; counter < AUDIO_BUFFER_SIZE; counter++) {
+    f_gets(&byte_read, 2, file_ptr); // lê um byte do arquivo no SD card
+    CircBufferInsert(&audioBuffer, byte_read);
   }
+
+  DWORD file_size = f_size(file_ptr); 
+  HAL_TIM_Base_Start_IT(&htim1);
+
+  while(counter < file_size){
+    if(!CircBufferIsFull(&audioBuffer)){
+      f_gets(&byte_read, 2, file_ptr); // lê um byte do arquivo no SD card
+      CircBufferInsert(&audioBuffer, byte_read);
+      counter++;
+    }
+  }
+
   TIM1->CCR1 = 0; // Interrompe o PWM
+  HAL_TIM_Base_Stop_IT(&htim1);
 }
 
 /* USER CODE END 4 */
