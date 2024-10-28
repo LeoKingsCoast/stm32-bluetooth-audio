@@ -58,13 +58,39 @@ O functionamento descrito acima pode ser visualizado no diagrama de estados abai
 
 ![diagrama-de-estados](img/estados.jpg) 
 
-### Problemas que podem ocorrer
+### Se o áudio não for enviado
 
-- O programa que envia o áudio por bluetooth assume que o módulo foi conectado através da porta seria /dev/rfcomm0. Verifique se este é o caso. Você pode usar o comando `dmesg` após conectar o módulo bluetooth para verificar em qual porta ele foi conectado. É possível que o seu driver bluetooth também mostre essa informação dentre as propriedades do dispositivo conectado.
+#### O Dispositivo está desconectado
+
+O programa que envia o áudio por bluetooth assume que o módulo foi conectado através da porta serial /dev/rfcomm0. Verifique se este é o caso. Você pode usar o comando `dmesg` após conectar o módulo bluetooth para verificar em qual porta ele foi conectado. É possível que o seu driver bluetooth também mostre essa informação dentre as propriedades do dispositivo conectado.
+
+Se você usa Ubuntu:
+
+- Abrindo o menu de configuração bluetooth (`blueman`), clique com o botão direito no dispositivo. Pareie o dispositivo (a senha padrão do HC-06 é "1234") e clique em "Connect To: Serial Port". O dispositivo deve ser conectado a `/dev/rfcomm0`. 
+
+Se você usa Arch:
+
+- Use o `bluetoothctl` para conectar parear o dispositivo caso não tenha feito antes.
+```bash
+bluetoothctl
+[bluetooth]# scan on
+[bluetooth]# scan off
+[bluetooth]# devices
+[bluetooth]# pair "ID do HC-06"
+[bluetooth]# exit
+```
+
+- Utilizando o mesmo ID obtido no `bluetoothctl`, conecte o dispositivo à porta `rfcomm0`:
+```bash
+sudo rfcomm bind 0 "ID do HC-06"
+```
+
+#### Sem permissão para fazer o envio
 
 - Se o dispositivo estiver conectado na porta correta, mas o programa ainda não conseguir conectar, é possível que seu usuário não possua permissão para acessar a porta bluetooth. Nesse caso, execute o seguinte comando (*Será preciso relogar para que esse comando seja efetivado*):
 ```bash
-sudo adduser $USER dialout
+sudo adduser $USER dialout # Ubuntu
+sudo gpasswd -a $USER uucp # Arch
 ```
 
 ## Componentes utilizados
